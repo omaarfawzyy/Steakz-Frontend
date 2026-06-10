@@ -1,4 +1,7 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api/v1';
+const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+const API_BASE_URL = rawApiUrl.endsWith('/api/v1')
+  ? rawApiUrl
+  : `${rawApiUrl.replace(/\/$/, '')}/api/v1`;
 export const AUTH_TOKEN_KEY = 'steakz-auth-token-v1';
 
 class ApiClient {
