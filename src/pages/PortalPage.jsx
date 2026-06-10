@@ -15,6 +15,7 @@ const sectionMap = {
   chef: [
     { id: 'overview', label: 'Overview', hint: 'Kitchen pulse' },
     { id: 'orders', label: 'Orders', hint: 'Move tickets forward' },
+    { id: 'bookings', label: 'Bookings', hint: 'Expected covers' },
     { id: 'shifts', label: 'Shifts', hint: 'Next week rota' },
   ],
   waiter: [
@@ -713,6 +714,7 @@ function renderCustomerSection(props) {
 
 function renderChefSection(props) {
   const pendingOrders = props.scopedOrders.filter((order) => order.status === 'Pending').length;
+  const activeBookings = props.scopedBookings.filter((booking) => !['Cancelled', 'Completed'].includes(booking.status));
 
   if (props.section === 'overview') {
     return (
@@ -721,22 +723,41 @@ function renderChefSection(props) {
           <MetricCard label="Pending tickets" value={pendingOrders} detail="Orders still waiting to fire." />
           <MetricCard label="Preparing now" value={props.scopedOrders.filter((order) => order.status === 'Preparing').length} detail="Orders currently in the kitchen." accent="bronze" />
           <MetricCard label="Ready orders" value={props.scopedOrders.filter((order) => order.status === 'Ready').length} detail="Tickets ready for service." accent="cream" />
-          <MetricCard label="Upcoming shifts" value={props.scopedShifts.length} detail="Your rota for the next week." accent="soft" />
+          <MetricCard label="Expected covers" value={activeBookings.length} detail="Bookings still due for service." accent="soft" />
         </div>
-        <Panel>
-          <SectionHeading title="Kitchen pass" description="Live tickets for the kitchen line." />
-          <div className="stack-md">
-            {props.scopedOrders.slice(0, 5).map((order) => (
-              <article key={order.id} className="timeline-card">
-                <div>
-                  <strong>{order.id}</strong>
-                  <p>{order.customerName} - {currency(order.total)}</p>
-                </div>
-                <StatusBadge>{order.status}</StatusBadge>
-              </article>
-            ))}
-          </div>
-        </Panel>
+        <div className="content-grid">
+          <Panel>
+            <SectionHeading title="Kitchen pass" description="Live tickets for the kitchen line." />
+            <div className="stack-md">
+              {props.scopedOrders.slice(0, 5).map((order) => (
+                <article key={order.id} className="timeline-card">
+                  <div>
+                    <strong>{order.id}</strong>
+                    <p>{order.customerName} - {currency(order.total)}</p>
+                  </div>
+                  <StatusBadge>{order.status}</StatusBadge>
+                </article>
+              ))}
+            </div>
+          </Panel>
+          <Panel>
+            <SectionHeading title="Upcoming arrivals" description="Bookings that help the kitchen anticipate service demand." />
+            <div className="stack-md">
+              {activeBookings.slice(0, 5).map((booking) => (
+                <article key={booking.id} className="timeline-card">
+                  <div>
+                    <strong>{booking.customerName}</strong>
+                    <p>{formatDateTime(booking.dateTime)} - {booking.partySize} guests</p>
+                  </div>
+                  <StatusBadge>{booking.status}</StatusBadge>
+                </article>
+              ))}
+              {!activeBookings.length ? (
+                <p className="muted-copy">No upcoming bookings for this branch right now.</p>
+              ) : null}
+            </div>
+          </Panel>
+        </div>
       </div>
     );
   }
@@ -762,6 +783,25 @@ function renderChefSection(props) {
             },
           ]}
           rows={props.scopedOrders}
+        />
+      </Panel>
+    );
+  }
+
+  if (props.section === 'bookings') {
+    return (
+      <Panel>
+        <SectionHeading title="Expected bookings" description="Dining room covers the kitchen should prepare for." />
+        <DataTable
+          columns={[
+            { key: 'customerName', label: 'Guest' },
+            { key: 'partySize', label: 'Party' },
+            { key: 'dateTime', label: 'When', render: (row) => formatDateTime(row.dateTime) },
+            { key: 'occasion', label: 'Occasion' },
+            { key: 'status', label: 'Status', render: (row) => <StatusBadge>{row.status}</StatusBadge> },
+          ]}
+          rows={props.scopedBookings}
+          emptyText="No bookings are assigned to this branch yet."
         />
       </Panel>
     );
@@ -1352,6 +1392,10 @@ function renderAdminSection(props) {
   const activeUsers = adminUsers.filter((user) => user.status === 'Active').length;
   const inactiveUsers = adminUsers.length - activeUsers;
   const adminCount = adminUsers.filter((user) => user.role === 'admin').length;
+  const pendingBookings = props.store.bookings.filter((booking) => booking.status === 'Pending').length;
+  const activeOrders = props.store.orders.filter((order) => !['Completed', 'Cancelled'].includes(order.status)).length;
+  const branchlessUsers = adminUsers.filter((user) => !user.branchId && user.role !== 'admin' && user.role !== 'hq-manager').length;
+  const menuItemsCount = props.store.menuItems.length;
 
   if (props.section === 'overview') {
     return (
@@ -1364,25 +1408,60 @@ function renderAdminSection(props) {
         </div>
         <div className="content-grid">
           <Panel>
-            <SectionHeading title="System operations" description="Core service areas monitored by the Steakz technology team." />
+            <SectionHeading title="Platform watchlist" description="Operational items that need admin visibility across the full system." />
             <div className="stack-md">
-              {props.store.apiReadiness.map((entry) => (
-                <article key={entry.endpoint} className="timeline-card">
-                  <div>
-                    <strong>{entry.name}</strong>
-                    <p>{entry.method} {entry.endpoint}</p>
-                  </div>
-                  <StatusBadge tone="info">{entry.status}</StatusBadge>
-                </article>
-              ))}
+              <article className="timeline-card">
+                <div>
+                  <strong>{pendingBookings} pending bookings</strong>
+                  <p>Reservations still waiting for confirmation across Steakz branches.</p>
+                </div>
+                <StatusBadge tone={pendingBookings ? 'warning' : 'success'}>
+                  {pendingBookings ? 'Needs review' : 'Clear'}
+                </StatusBadge>
+              </article>
+              <article className="timeline-card">
+                <div>
+                  <strong>{activeOrders} active orders</strong>
+                  <p>Current live service tickets moving through kitchen and floor teams.</p>
+                </div>
+                <StatusBadge tone="info">Live service</StatusBadge>
+              </article>
+              <article className="timeline-card">
+                <div>
+                  <strong>{branchlessUsers} unassigned branch users</strong>
+                  <p>Branch-scoped roles should be reviewed if they are not linked to a location.</p>
+                </div>
+                <StatusBadge tone={branchlessUsers ? 'warning' : 'success'}>
+                  {branchlessUsers ? 'Action needed' : 'Assigned'}
+                </StatusBadge>
+              </article>
             </div>
           </Panel>
           <Panel>
-            <SectionHeading title="Admin controls" description="Admins can manage users, branches, and system visibility." />
-            <p className="muted-copy">
-              Administrative tools are separated from daily restaurant workflows so each team
-              works from a focused portal.
-            </p>
+            <SectionHeading title="Admin priorities" description="Use the core admin sections to keep every branch correctly configured." />
+            <div className="stack-md">
+              <article className="timeline-card">
+                <div>
+                  <strong>User access</strong>
+                  <p>Review enabled accounts, roles, and deactivations from the Users section.</p>
+                </div>
+                <StatusBadge tone="success">{activeUsers} active</StatusBadge>
+              </article>
+              <article className="timeline-card">
+                <div>
+                  <strong>Branch configuration</strong>
+                  <p>Maintain location details and system-wide coverage for all live branches.</p>
+                </div>
+                <StatusBadge tone="info">{props.store.branches.length} branches</StatusBadge>
+              </article>
+              <article className="timeline-card">
+                <div>
+                  <strong>Menu catalogue</strong>
+                  <p>Track shared and branch-linked items that are visible across the platform.</p>
+                </div>
+                <StatusBadge tone="info">{menuItemsCount} items</StatusBadge>
+              </article>
+            </div>
           </Panel>
         </div>
       </div>

@@ -521,7 +521,7 @@ export function AppProvider({ children }) {
     async function fetchAccountActivity() {
       try {
         const canReadOrders = ['admin', 'hq-manager', 'branch-manager', 'chef', 'waiter', 'customer'].includes(currentUser.role);
-        const canReadBookings = ['admin', 'hq-manager', 'branch-manager', 'waiter', 'customer'].includes(currentUser.role);
+        const canReadBookings = ['admin', 'hq-manager', 'branch-manager', 'chef', 'waiter', 'customer'].includes(currentUser.role);
         const canReadUsers = ['admin', 'hq-manager'].includes(currentUser.role);
         const canReadStaff = ['admin', 'hq-manager', 'branch-manager'].includes(currentUser.role);
         const canReadShifts = ['admin', 'branch-manager', 'chef', 'waiter'].includes(currentUser.role);
