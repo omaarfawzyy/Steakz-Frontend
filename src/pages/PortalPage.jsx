@@ -1384,7 +1384,8 @@ function isDemoWaiterUser(user) {
   }
 
   const identity = `${user.id ?? ''} ${user.name ?? ''} ${user.email ?? ''}`.toLowerCase();
-  return identity.includes('demo') || identity.includes('sample') || identity.includes('waiter@steakz.local');
+  const email = `${user.email ?? ''}`.toLowerCase().trim();
+  return identity.includes('demo') || identity.includes('sample') || email === 'waiter@steakz.local';
 }
 
 function renderAdminSection(props) {
